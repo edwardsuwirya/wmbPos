@@ -4,8 +4,9 @@ import "gorm.io/gorm"
 
 type CustomerOrderDetail struct {
 	CustomerOrderID string
-	MenuID  string
-	Qty     int
+	MenuID          string
+	Qty             int
+	Price           int
 	gorm.Model
 }
 

@@ -1,26 +1,31 @@
 package config
 
 import (
-	"database/sql"
 	"fmt"
-	"github.com/edwardsuwirya/wmbPos/delivery"
-	"github.com/edwardsuwirya/wmbPos/entity"
-	"github.com/edwardsuwirya/wmbPos/manager"
 	"github.com/gin-gonic/gin"
-	"log"
 	"os"
 )
 
 type Config struct {
-	InfraManager   manager.Infra
-	RepoManager    manager.RepoManager
-	UseCaseManager manager.UseCaseManager
-	RouterEngine   *gin.Engine
-	ApiBaseUrl     string
-	runMigration   string
+	RouterEngine          *gin.Engine
+	ApiBaseUrl            string
+	RunMigration          string
+	DataSourceName        string
+	TableManagementConfig TableManagementConfig
+	OpoPaymentConfig      OpoPaymentConfig
+}
+
+type TableManagementConfig struct {
+	ApiBaseUrl string
+}
+
+type OpoPaymentConfig struct {
+	ApiBaseUrl      string
+	ClientSecretKey string
 }
 
 func NewConfig() *Config {
+	config := new(Config)
 	runMigration := os.Getenv("DB_MIGRATION")
 	apiHost := os.Getenv("API_HOST")
 	apiPort := os.Getenv("API_PORT")
@@ -31,48 +36,28 @@ func NewConfig() *Config {
 	dbUser := os.Getenv("DB_USER")
 	dbPassword := os.Getenv("DB_PASSWORD")
 
-	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s", dbHost, dbUser, dbPassword, dbName, dbPort)
-	infraManager := manager.NewInfra(dsn)
-	repoManager := manager.NewRepoManager(infraManager)
-	useCaseManager := manager.NewUseCaseManger(repoManager)
+	//baseURL = "http://localhost:8888/api/table"
+	tableManagementBaseUrl := os.Getenv("TABLE_API")
+	tableManagementConfig := TableManagementConfig{ApiBaseUrl: tableManagementBaseUrl}
 
-	config := new(Config)
-	config.InfraManager = infraManager
-	config.RepoManager = repoManager
-	config.UseCaseManager = useCaseManager
+	//opoBaseURL = "http://159.223.42.164:8899/opo/payment"
+	//key = "E157934D-EA2E-49F6-9DCE-398B750BE4F0"
+	opoPaymentBaseUrl := os.Getenv("OPO_API")
+	opoSecretKey := os.Getenv("OPO_KEY")
+	opoPaymentConfig := OpoPaymentConfig{
+		ApiBaseUrl:      opoPaymentBaseUrl,
+		ClientSecretKey: opoSecretKey,
+	}
+	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s", dbHost, dbUser, dbPassword, dbName, dbPort)
+	config.DataSourceName = dsn
+	config.TableManagementConfig = tableManagementConfig
+	config.OpoPaymentConfig = opoPaymentConfig
 
 	r := gin.Default()
-	delivery.NewServer(r, useCaseManager)
 	config.RouterEngine = r
 
 	config.ApiBaseUrl = fmt.Sprintf("%s:%s", apiHost, apiPort)
-	config.runMigration = runMigration
+	config.RunMigration = runMigration
 
 	return config
-}
-
-func (c *Config) RunMigration() {
-	if c.runMigration == "Y" || c.runMigration == "y" {
-		db := c.InfraManager.SqlDb()
-		err := db.AutoMigrate(&entity.CustomerOrder{}, &entity.CustomerOrderDetail{})
-		if err != nil {
-			log.Fatalln(err)
-		}
-	}
-}
-
-func (c *Config) StartEngine() {
-	if !(c.runMigration == "Y" || c.runMigration == "y") {
-		db, _ := c.InfraManager.SqlDb().DB()
-		defer func(db *sql.DB) {
-			err := db.Close()
-			if err != nil {
-				log.Fatalln(err)
-			}
-		}(db)
-		err := c.RouterEngine.Run(c.ApiBaseUrl)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
 }

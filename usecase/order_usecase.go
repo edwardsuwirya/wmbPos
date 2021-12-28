@@ -6,22 +6,25 @@ import (
 	"github.com/edwardsuwirya/wmbPos/entity"
 	"github.com/edwardsuwirya/wmbPos/repository"
 	"gorm.io/gorm"
+	"log"
 )
 
 type IOrderUseCase interface {
 	OpenOrder(order dto.CustomerOrderRequest) (*entity.CustomerOrder, error)
-	CloseOrder(billNo string, paymentMethod string) (string, error)
+	CloseOrder(closeOrderInfo dto.CloseOrderRequest) (string, error)
 }
 
 type OrderUseCase struct {
-	orderRepo   repository.IOrderRepository
-	resvUseCase IOrderTableReservationUseCase
+	orderRepo           repository.IOrderRepository
+	resvUseCase         IOrderTableReservationUseCase
+	orderPaymentUseCase IOrderPaymentUseCase
 }
 
-func NewOrderUseCase(orderRepo repository.IOrderRepository, resvUseCase IOrderTableReservationUseCase) IOrderUseCase {
+func NewOrderUseCase(orderRepo repository.IOrderRepository, resvUseCase IOrderTableReservationUseCase, paymentUseCase IOrderPaymentUseCase) IOrderUseCase {
 	return &OrderUseCase{
-		orderRepo:   orderRepo,
-		resvUseCase: resvUseCase,
+		orderRepo:           orderRepo,
+		resvUseCase:         resvUseCase,
+		orderPaymentUseCase: paymentUseCase,
 	}
 }
 
@@ -31,14 +34,14 @@ func (o *OrderUseCase) OpenOrder(order dto.CustomerOrderRequest) (*entity.Custom
 		orderDetail := entity.CustomerOrderDetail{
 			MenuID: od.MenuId,
 			Qty:    od.Qty,
+			Price:  od.Price,
 		}
 		orderDetails = append(orderDetails, orderDetail)
 	}
 	ord, err := o.orderRepo.CreateOne(entity.CustomerOrder{
-		CustomerName:  order.CustomerName,
-		PaymentMethod: "",
-		OrderDetails:  orderDetails,
-		Model:         gorm.Model{},
+		CustomerName: order.CustomerName,
+		OrderDetails: orderDetails,
+		Model:        gorm.Model{},
 	})
 	if err != nil {
 		return nil, err
@@ -53,14 +56,20 @@ func (o *OrderUseCase) OpenOrder(order dto.CustomerOrderRequest) (*entity.Custom
 	return ord, nil
 }
 
-func (o *OrderUseCase) CloseOrder(billNo string, paymentMethod string) (string, error) {
-	billId, err := o.orderRepo.UpdatePaymentMethod(billNo, paymentMethod)
+func (o *OrderUseCase) CloseOrder(closeOrderInfo dto.CloseOrderRequest) (string, error) {
+	total, err := o.orderRepo.GetSummaryPrice(closeOrderInfo.BillNo)
+	log.Println(total)
 	if err != nil {
 		return "", err
 	}
-	err = o.resvUseCase.CloseTable(billId)
+	closeOrderInfo.Total = total
+	billId, err := o.orderPaymentUseCase.Payment(closeOrderInfo)
 	if err != nil {
-		return billId, err
+		return "", err
 	}
-	return billId, nil
+	err = o.resvUseCase.CloseTable(billId.CustomerOrderID)
+	if err != nil {
+		return billId.CustomerOrderID, err
+	}
+	return billId.CustomerOrderID, nil
 }

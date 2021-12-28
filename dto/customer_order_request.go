@@ -9,4 +9,5 @@ type CustomerOrderRequest struct {
 type CustomerOrderDetailRequest struct {
 	MenuId string
 	Qty    int
+	Price  int
 }

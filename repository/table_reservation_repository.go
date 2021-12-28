@@ -5,35 +5,32 @@ import (
 	"encoding/json"
 	"errors"
 	"github.com/edwardsuwirya/wmbPos/apperror"
+	"github.com/edwardsuwirya/wmbPos/config"
 	"github.com/edwardsuwirya/wmbPos/delivery/appresponse"
 	"github.com/edwardsuwirya/wmbPos/dto"
 	"io/ioutil"
 	"net"
 	"net/http"
-	"time"
 )
 
-var baseURL = "http://localhost:8888/api/table"
-
 type ITableOrderReservationRepository interface {
-	ReserveOne(table dto.TableRequest) error
-	Close(billNo string) error
+	CallTableCheckIn(table dto.TableRequest) error
+	CallTableCheckOut(billNo string) error
 }
 
 type TableOrderReservationRepository struct {
-	httpClient *http.Client
+	httpClient            *http.Client
+	tableManagementConfig config.TableManagementConfig
 }
 
-func NewTableOrderReservation() ITableOrderReservationRepository {
-	var netClient = &http.Client{
-		Timeout: time.Second * 10,
-	}
+func NewTableOrderReservation(httpClient *http.Client, config config.TableManagementConfig) ITableOrderReservationRepository {
 	return &TableOrderReservationRepository{
-		httpClient: netClient,
+		httpClient:            httpClient,
+		tableManagementConfig: config,
 	}
 }
-func (t *TableOrderReservationRepository) Close(billNo string) error {
-	req, err := http.NewRequest(http.MethodPut, baseURL+"/checkout?billNo="+billNo, nil)
+func (t *TableOrderReservationRepository) CallTableCheckOut(billNo string) error {
+	req, err := http.NewRequest(http.MethodPut, t.tableManagementConfig.ApiBaseUrl+"/checkout?billNo="+billNo, nil)
 	if err != nil {
 		return err
 	}
@@ -44,15 +41,15 @@ func (t *TableOrderReservationRepository) Close(billNo string) error {
 		}
 		return err
 	}
-	if resp.StatusCode == 200 {
+	if resp.StatusCode == http.StatusOK {
 		return nil
 	}
 	return errors.New("Failed to check out table")
 }
-func (t *TableOrderReservationRepository) ReserveOne(table dto.TableRequest) error {
+func (t *TableOrderReservationRepository) CallTableCheckIn(table dto.TableRequest) error {
 	postBody, _ := json.Marshal(table)
 	responseBody := bytes.NewBuffer(postBody)
-	resp, err := t.httpClient.Post(baseURL+"/checkin", "application/json", responseBody)
+	resp, err := t.httpClient.Post(t.tableManagementConfig.ApiBaseUrl+"/checkin", "application/json", responseBody)
 	if err != nil {
 		if err, ok := err.(net.Error); ok && err.Timeout() {
 			return apperror.ClientTimeOut
@@ -60,6 +57,10 @@ func (t *TableOrderReservationRepository) ReserveOne(table dto.TableRequest) err
 		return errors.New("Can not connect to Table Reservation API")
 	}
 	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return errors.New("Failed Table Reservation API")
+	}
+
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return err

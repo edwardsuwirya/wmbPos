@@ -1,9 +1,7 @@
 package main
 
-import "github.com/edwardsuwirya/wmbPos/config"
+import "github.com/edwardsuwirya/wmbPos/api"
 
 func main() {
-	appConfig := config.NewConfig()
-	appConfig.RunMigration()
-	appConfig.StartEngine()
+	api.NewApiServer().Run()
 }

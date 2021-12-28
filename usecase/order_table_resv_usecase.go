@@ -21,9 +21,9 @@ func NewOrderTableReservationUseCase(resvRepo repository.ITableOrderReservationR
 }
 
 func (r *OrderTableReservationUseCase) ReserveTable(req dto.TableRequest) error {
-	return r.resvRepo.ReserveOne(req)
+	return r.resvRepo.CallTableCheckIn(req)
 }
 
 func (r *OrderTableReservationUseCase) CloseTable(billNo string) error {
-	return r.resvRepo.Close(billNo)
+	return r.resvRepo.CallTableCheckOut(billNo)
 }

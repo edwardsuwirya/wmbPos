@@ -6,10 +6,10 @@ import (
 )
 
 type CustomerOrder struct {
-	ID            string `gorm:"column:id;size:36;primaryKey"`
-	CustomerName  string `gorm:"size:36;"`
-	PaymentMethod string `gorm:"size:10;"`
-	OrderDetails  []CustomerOrderDetail
+	ID           string `gorm:"column:id;size:36;primaryKey"`
+	CustomerName string `gorm:"size:36;"`
+	OrderPayment OrderPayment
+	OrderDetails []CustomerOrderDetail
 	gorm.Model
 }
 

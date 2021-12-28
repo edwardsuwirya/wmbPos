@@ -53,7 +53,7 @@ func (api *OrderApi) closeOrder(c *gin.Context) {
 		appresponse.NewJsonResponse(c).SendError(appresponse.NewBadRequestError(err, "Failed Close Order"))
 		return
 	}
-	_, err := api.usecase.CloseOrder(closeOrderRequest.BillNo, closeOrderRequest.PaymentMethod)
+	_, err := api.usecase.CloseOrder(closeOrderRequest)
 	if err != nil {
 		if err == apperror.ClientTimeOut {
 			appresponse.NewJsonResponse(c).SendData(appresponse.NewResponseMessage("FAILED", "Table Reservation Time out", nil))
